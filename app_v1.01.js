@@ -16,6 +16,16 @@
   const VERSION = "1.01";
   const STORAGE_KEY = "focus_compass_v1";
   const now = () => new Date().toISOString();
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyBZn3bOj99GSFvsZGSKctjdz-IrcPos4NM",
+    authDomain: "focuscompass-75e44.firebaseapp.com",
+    projectId: "focuscompass-75e44",
+    storageBucket: "focuscompass-75e44.firebasestorage.app",
+    messagingSenderId: "334786606663",
+    appId: "1:334786606663:web:f0b02dcde30fd71aa76362",
+    measurementId: "G-BSBT6PJ9Q4"
+  };
+  const BACKUP_DEBOUNCE_MS = 30000;
 
   // ---------- Utilities ----------
   const uid = () => Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
@@ -107,7 +117,10 @@
     }
   };
 
-  const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const save = () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    scheduleBackup();
+  };
 
   // ---------- DOM helpers ----------
   const $ = (sel) => document.querySelector(sel);
@@ -143,6 +156,55 @@
 
   // ---------- State ----------
   let state = load();
+
+  // ---------- Firestore backup ----------
+  let firestoreDb = null;
+  let backupTimer = null;
+  let pendingBackup = false;
+
+  function getDeviceId() {
+    const key = "focus_compass_device_id";
+    let id = localStorage.getItem(key);
+    if(!id) {
+      id = uid();
+      localStorage.setItem(key, id);
+    }
+    return id;
+  }
+
+  function initFirestore() {
+    if(!window.firebase || !FIREBASE_CONFIG || !FIREBASE_CONFIG.projectId) return;
+    try {
+      if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+      firestoreDb = firebase.firestore();
+    } catch {
+      firestoreDb = null;
+    }
+  }
+
+  function scheduleBackup() {
+    pendingBackup = true;
+    if(!firestoreDb) return;
+    clearTimeout(backupTimer);
+    backupTimer = setTimeout(runBackup, BACKUP_DEBOUNCE_MS);
+  }
+
+  async function runBackup() {
+    if(!firestoreDb) return;
+    if(!navigator.onLine) return;
+    try {
+      const deviceId = getDeviceId();
+      const payload = {
+        state,
+        updatedAt: now(),
+        version: VERSION
+      };
+      await firestoreDb.collection("backups").doc(deviceId).set(payload);
+      pendingBackup = false;
+    } catch {
+      pendingBackup = true;
+    }
+  }
 
   // ---------- Timer (simple, local) ----------
   const timer = {
@@ -1833,6 +1895,7 @@
     });
 
     // initial state
+    initFirestore();
     applyLowStim();
     applyMinimalMode();
     applyToolsCollapsed();
@@ -1840,6 +1903,10 @@
     renderAll();
     showTool("tenMin"); // default helpful tool
     startOnboarding(false);
+
+    window.addEventListener("online", () => {
+      if(pendingBackup) scheduleBackup();
+    });
   }
 
   init();
