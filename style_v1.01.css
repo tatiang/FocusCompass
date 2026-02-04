@@ -376,6 +376,28 @@ body.minimal .tools-head{
   margin-top: 0;
 }
 
+.filter-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin: 0 0 16px;
+}
+.tag-filters{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.tag-filters .chip{
+  font-size: 12px;
+}
+.chip.active{
+  background: #fff7f5;
+  border-color: rgba(228,67,50,.4);
+}
+.chip.active:hover{
+  border-color: rgba(228,67,50,.6);
+}
+
 .tag-row{
   display:flex;
   flex-wrap:wrap;

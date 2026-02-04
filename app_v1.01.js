@@ -41,6 +41,22 @@
     });
     return out;
   };
+  const TAG_PALETTE = [
+    "#f59e0b",
+    "#ef4444",
+    "#10b981",
+    "#3b82f6",
+    "#8b5cf6",
+    "#ec4899",
+    "#14b8a6",
+    "#22c55e",
+    "#6366f1"
+  ];
+  const hashTag = (tag) => {
+    let h = 0;
+    for(let i = 0; i < tag.length; i += 1) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+    return h;
+  };
 
   // ---------- Default data ----------
   const defaultState = () => ({
@@ -57,6 +73,8 @@
       minimalMode: false,
       toolsCollapsed: true
     },
+    tagColors: {},
+    activeTagFilter: "all",
     tags: [
       "coding",
       "personal",
@@ -791,6 +809,18 @@
     return state.tags;
   }
 
+  function getTagColor(tag) {
+    const clean = normalizeTag(tag);
+    if(!clean) return "#e5e7eb";
+    if(!state.tagColors) state.tagColors = {};
+    if(!state.tagColors[clean]) {
+      const idx = hashTag(clean) % TAG_PALETTE.length;
+      state.tagColors[clean] = TAG_PALETTE[idx];
+      save();
+    }
+    return state.tagColors[clean];
+  }
+
   function addTag(tag) {
     const clean = normalizeTag(tag);
     if(!clean) return;
@@ -798,6 +828,7 @@
     if(tags.some(t => t.toLowerCase() === clean.toLowerCase())) return;
     tags.push(clean);
     state.tags = tags;
+    getTagColor(clean);
     save();
   }
 
@@ -809,6 +840,10 @@
     if(!tags.some(t => t.toLowerCase() === oldClean.toLowerCase())) return;
     if(tags.some(t => t.toLowerCase() === newClean.toLowerCase())) return;
     state.tags = tags.map(t => (t.toLowerCase() === oldClean.toLowerCase() ? newClean : t));
+    if(state.tagColors && state.tagColors[oldClean]) {
+      state.tagColors[newClean] = state.tagColors[oldClean];
+      delete state.tagColors[oldClean];
+    }
     state.tasks.forEach(t => {
       t.tags = normalizeTags((t.tags || []).map(x => (x.toLowerCase() === oldClean.toLowerCase() ? newClean : x)));
     });
@@ -822,6 +857,7 @@
     const clean = normalizeTag(tag);
     if(!clean) return;
     state.tags = getAllTags().filter(t => t.toLowerCase() !== clean.toLowerCase());
+    if(state.tagColors) delete state.tagColors[clean];
     state.tasks.forEach(t => {
       t.tags = normalizeTags((t.tags || []).filter(x => x.toLowerCase() !== clean.toLowerCase()));
     });
@@ -953,13 +989,21 @@
 
     const priorityList = $("#priorityList");
     const inboxList = $("#inboxList");
+    renderTagFilters("#tagFiltersToday");
     priorityList.innerHTML = "";
     inboxList.innerHTML = "";
+
+    const activeTag = state.activeTagFilter || "all";
+    const tagMatch = (t) => {
+      if(activeTag === "all") return true;
+      return (t.tags || []).some(tag => tag.toLowerCase() === activeTag.toLowerCase());
+    };
 
     // Priorities in order
     const priorityTasks = state.priorities
       .map(id => getTask(id))
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter(tagMatch);
 
     if(priorityTasks.length === 0) {
       priorityList.appendChild(el("div", { class:"muted", text:"No priorities yet. Add up to your WIP limit." }));
@@ -969,7 +1013,7 @@
 
     // Inbox = open tasks not in priorities + done tasks (so you can see wins) + anything captured
     const prioritySet = new Set(state.priorities);
-    const inbox = state.tasks.filter(t => !prioritySet.has(t.id));
+    const inbox = state.tasks.filter(t => !prioritySet.has(t.id)).filter(tagMatch);
 
     if(inbox.length === 0) {
       inboxList.appendChild(el("div", { class:"muted", text:"Your capture inbox is empty. Nice." }));
@@ -984,8 +1028,15 @@
   function renderProjects() {
     const list = $("#projectList");
     list.innerHTML = "";
+    renderTagFilters("#tagFiltersProjects");
 
-    const active = state.projects.filter(p => !p.archived);
+    const activeTag = state.activeTagFilter || "all";
+    const projectMatch = (p) => {
+      if(activeTag === "all") return true;
+      return (p.tags || []).some(tag => tag.toLowerCase() === activeTag.toLowerCase());
+    };
+
+    const active = state.projects.filter(p => !p.archived).filter(projectMatch);
     if(active.length === 0) {
       list.appendChild(el("div", { class:"muted", text:"No projects yet. Create one for anything that’s more than one step." }));
     } else {
@@ -1296,9 +1347,44 @@
     if(cleaned.length === 0) return null;
     const row = el("div", { class:"tag-row" });
     cleaned.forEach(tag => {
-      row.appendChild(el("span", { class:"tag", text: tag }));
+      const chip = el("span", { class:"tag", text: tag });
+      const color = getTagColor(tag);
+      chip.style.borderColor = color;
+      chip.style.color = color;
+      row.appendChild(chip);
     });
     return row;
+  }
+
+  function renderTagFilters(containerId) {
+    const box = $(containerId);
+    if(!box) return;
+    box.innerHTML = "";
+    const tags = getAllTags();
+    const active = state.activeTagFilter || "all";
+
+    const allBtn = el("button", { class:"chip", text:"All" });
+    allBtn.classList.toggle("active", active === "all");
+    allBtn.addEventListener("click", () => {
+      state.activeTagFilter = "all";
+      save();
+      renderAll();
+    });
+    box.appendChild(allBtn);
+
+    tags.forEach(tag => {
+      const btn = el("button", { class:"chip", text: tag });
+      const color = getTagColor(tag);
+      btn.style.borderColor = color;
+      btn.style.color = color;
+      btn.classList.toggle("active", active === tag);
+      btn.addEventListener("click", () => {
+        state.activeTagFilter = (active === tag ? "all" : tag);
+        save();
+        renderAll();
+      });
+      box.appendChild(btn);
+    });
   }
 
   function renderTagManager() {
