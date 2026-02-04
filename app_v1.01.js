@@ -27,6 +27,20 @@
     } catch { return ""; }
   };
   const safeText = (s) => (s || "").toString().trim();
+  const normalizeTag = (t) => safeText(t).replace(/\s+/g, " ").trim();
+  const normalizeTags = (arr) => {
+    const out = [];
+    const seen = new Set();
+    (arr || []).forEach(t => {
+      const tag = normalizeTag(t);
+      if(!tag) return;
+      const key = tag.toLowerCase();
+      if(seen.has(key)) return;
+      seen.add(key);
+      out.push(tag);
+    });
+    return out;
+  };
 
   // ---------- Default data ----------
   const defaultState = () => ({
@@ -43,11 +57,22 @@
       minimalMode: false,
       toolsCollapsed: true
     },
+    tags: [
+      "coding",
+      "personal",
+      "work",
+      "family",
+      "tech",
+      "tinkering",
+      "woodworking",
+      "3D printing",
+      "laser cutting"
+    ],
     // tasks not in priorities live in inbox ("captured")
-    tasks: [], // {id,text,status:'open'|'done', createdAt, doneAt?, pinned?:bool, due?:iso, projectId?}
+    tasks: [], // {id,text,status:'open'|'done', createdAt, doneAt?, pinned?:bool, due?:iso, projectId?, tags?:string[]}
     priorities: [], // array of task ids
     nextStepTaskId: null,
-    projects: [], // {id,name,why,doneDef, createdAt, archived?:bool}
+    projects: [], // {id,name,why,doneDef, createdAt, archived?:bool, tags?:string[]}
     routines: [], // {id,name,steps:[string], createdAt}
     wins: [], // {id,text,createdAt}
     interruptions: [] // {id,text,createdAt, resolved?:bool}
@@ -195,7 +220,8 @@
       createdAt: now(),
       pinned: !!opts.pinned,
       due: opts.due || null,
-      projectId: opts.projectId || null
+      projectId: opts.projectId || null,
+      tags: normalizeTags(opts.tags || [])
     };
     if(!t.text) return null;
     state.tasks.unshift(t);
@@ -363,7 +389,7 @@
 
   // ---------- Projects ----------
   function addProject(name) {
-    const p = { id: uid(), name: safeText(name), why:"", doneDef:"", createdAt: now(), archived:false };
+    const p = { id: uid(), name: safeText(name), why:"", doneDef:"", createdAt: now(), archived:false, tags: [] };
     if(!p.name) return null;
     state.projects.unshift(p);
     save();
@@ -373,6 +399,7 @@
   function updateProject(id, patch){
     const p = getProject(id);
     if(!p) return;
+    if(patch.tags) patch.tags = normalizeTags(patch.tags);
     Object.assign(p, patch);
     save();
   }
@@ -387,6 +414,7 @@
     const p = addProject(name);
     if(!p) return;
     task.projectId = p.id;
+    if(task.tags && task.tags.length) p.tags = normalizeTags(task.tags);
     save();
     selectedProjectId = p.id;
     renderProjects();
@@ -756,6 +784,84 @@
     save();
     renderReview();
   }
+
+  // ---------- Tags ----------
+  function getAllTags() {
+    state.tags = normalizeTags(state.tags || []);
+    return state.tags;
+  }
+
+  function addTag(tag) {
+    const clean = normalizeTag(tag);
+    if(!clean) return;
+    const tags = getAllTags();
+    if(tags.some(t => t.toLowerCase() === clean.toLowerCase())) return;
+    tags.push(clean);
+    state.tags = tags;
+    save();
+  }
+
+  function renameTag(oldTag, newTag) {
+    const oldClean = normalizeTag(oldTag);
+    const newClean = normalizeTag(newTag);
+    if(!oldClean || !newClean) return;
+    const tags = getAllTags();
+    if(!tags.some(t => t.toLowerCase() === oldClean.toLowerCase())) return;
+    if(tags.some(t => t.toLowerCase() === newClean.toLowerCase())) return;
+    state.tags = tags.map(t => (t.toLowerCase() === oldClean.toLowerCase() ? newClean : t));
+    state.tasks.forEach(t => {
+      t.tags = normalizeTags((t.tags || []).map(x => (x.toLowerCase() === oldClean.toLowerCase() ? newClean : x)));
+    });
+    state.projects.forEach(p => {
+      p.tags = normalizeTags((p.tags || []).map(x => (x.toLowerCase() === oldClean.toLowerCase() ? newClean : x)));
+    });
+    save();
+  }
+
+  function deleteTag(tag) {
+    const clean = normalizeTag(tag);
+    if(!clean) return;
+    state.tags = getAllTags().filter(t => t.toLowerCase() !== clean.toLowerCase());
+    state.tasks.forEach(t => {
+      t.tags = normalizeTags((t.tags || []).filter(x => x.toLowerCase() !== clean.toLowerCase()));
+    });
+    state.projects.forEach(p => {
+      p.tags = normalizeTags((p.tags || []).filter(x => x.toLowerCase() !== clean.toLowerCase()));
+    });
+    save();
+  }
+
+  function openTagPicker({ title, selected, onSave }) {
+    const tags = getAllTags();
+    const picked = new Set((selected || []).map(t => t.toLowerCase()));
+    const wrap = el("div");
+    wrap.appendChild(el("div", { class:"muted small", text:"Select tags. You can manage tags in Settings." }));
+    const list = el("div", { class:"list", style:"margin-top:10px;" });
+    if(tags.length === 0) {
+      list.appendChild(el("div", { class:"muted", text:"No tags yet." }));
+    } else {
+      tags.forEach(tag => {
+        const row = el("div", { class:"item", style:"justify-content:space-between; align-items:center;" });
+        row.appendChild(el("div", { class:"item-title", text: tag }));
+        const check = el("input", { type:"checkbox" });
+        check.checked = picked.has(tag.toLowerCase());
+        check.addEventListener("change", () => {
+          if(check.checked) picked.add(tag.toLowerCase());
+          else picked.delete(tag.toLowerCase());
+        });
+        row.appendChild(check);
+        list.appendChild(row);
+      });
+    }
+    wrap.appendChild(list);
+    const saveBtn = el("button", { class:"btn", text:"Save", onclick: () => {
+      const next = tags.filter(t => picked.has(t.toLowerCase()));
+      onSave(normalizeTags(next));
+      closeModal();
+    }});
+    const cancelBtn = el("button", { class:"btn btn-ghost", text:"Cancel", onclick: closeModal });
+    openModal(title, wrap, [cancelBtn, saveBtn]);
+  }
   function removeInterruption(id){
     state.interruptions = state.interruptions.filter(x => x.id !== id);
     save();
@@ -809,6 +915,8 @@
     }
     metas.push(t.status === "done" ? "Done" : "Open");
     body.appendChild(el("div", { class:"item-meta", text: metas.join(" • ") }));
+    const tagRow = renderTagRow(t.tags || []);
+    if(tagRow) body.appendChild(tagRow);
 
     left.appendChild(check);
     left.appendChild(body);
@@ -821,6 +929,17 @@
     } else {
       actions.appendChild(el("button", { class:"iconbtn", text:"Add to priorities", onclick: () => addPriority(t.id) }));
     }
+    actions.appendChild(el("button", { class:"iconbtn", text:"Tags", onclick: () => {
+      openTagPicker({
+        title: "Task tags",
+        selected: t.tags || [],
+        onSave: (tags) => {
+          t.tags = tags;
+          save();
+          renderAll();
+        }
+      });
+    }}));
     if(!t.projectId) {
       actions.appendChild(el("button", { class:"iconbtn", text:"Convert to project", onclick: () => convertTaskToProject(t) }));
     }
@@ -880,6 +999,8 @@
         if(p.why) metaBits.push("why set");
         if(p.doneDef) metaBits.push("done defined");
         left.appendChild(el("div", { class:"item-meta", text: metaBits.length ? metaBits.join(" • ") : "needs definition" }));
+        const tagRow = renderTagRow(p.tags || []);
+        if(tagRow) left.appendChild(tagRow);
         row.appendChild(left);
 
         const actions = el("div", { class:"item-actions" });
@@ -923,6 +1044,16 @@
     }});
 
     const chunkBtn = el("button", { class:"btn btn-ghost", text:"Break this into steps", onclick: () => openChunkingModal(p) });
+    const tagBtn = el("button", { class:"btn btn-ghost", text:"Edit tags", onclick: () => {
+      openTagPicker({
+        title: "Project tags",
+        selected: p.tags || [],
+        onSave: (tags) => {
+          updateProject(p.id, { tags });
+          renderProjects();
+        }
+      });
+    }});
 
     const archiveBtn = el("button", { class:"btn btn-ghost", text:"Archive project", onclick: () => {
       updateProject(p.id, { archived:true });
@@ -937,7 +1068,7 @@
     box.appendChild(why);
     box.appendChild(el("div", { class:"label", style:"margin-top:10px;", text:"Definition of done (what counts as finished?)" }));
     box.appendChild(doneDef);
-    box.appendChild(el("div", { style:"margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;" }, [saveBtn, addTaskBtn, chunkBtn, archiveBtn]));
+    box.appendChild(el("div", { style:"margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;" }, [saveBtn, addTaskBtn, chunkBtn, tagBtn, archiveBtn]));
     box.appendChild(el("div", { class:"helper", text:"Next Step = the one task you’ll do next. It should be startable in under 10 minutes." }));
 
     // linked tasks
@@ -1160,6 +1291,45 @@
     applyToolsCollapsed();
   }
 
+  function renderTagRow(tags) {
+    const cleaned = normalizeTags(tags || []);
+    if(cleaned.length === 0) return null;
+    const row = el("div", { class:"tag-row" });
+    cleaned.forEach(tag => {
+      row.appendChild(el("span", { class:"tag", text: tag }));
+    });
+    return row;
+  }
+
+  function renderTagManager() {
+    const box = $("#tagManager");
+    if(!box) return;
+    box.innerHTML = "";
+    const tags = getAllTags();
+    if(tags.length === 0) {
+      box.appendChild(el("div", { class:"muted", text:"No tags yet." }));
+    } else {
+      tags.forEach(tag => {
+        const row = el("div", { class:"item", style:"justify-content:space-between; align-items:center;" });
+        row.appendChild(el("div", { class:"item-title", text: tag }));
+        const actions = el("div", { class:"item-actions" });
+        actions.appendChild(el("button", { class:"iconbtn", text:"Rename", onclick: () => {
+          const next = safeText(prompt("Rename tag:", tag));
+          if(!next || next === tag) return;
+          renameTag(tag, next);
+          renderAll();
+        }}));
+        actions.appendChild(el("button", { class:"iconbtn", text:"Delete", onclick: () => {
+          if(!confirm(`Delete tag “${tag}” from all tasks/projects?`)) return;
+          deleteTag(tag);
+          renderAll();
+        }}));
+        row.appendChild(actions);
+        box.appendChild(row);
+      });
+    }
+  }
+
   function applyLowStim() {
     document.body.classList.toggle("lowstim", !!state.settings.lowStim);
   }
@@ -1183,6 +1353,7 @@
     renderRoutines();
     renderReview();
     renderSettings();
+    renderTagManager();
   }
 
   // ---------- Onboarding tooltips ----------
@@ -1538,6 +1709,17 @@
       applyToolsCollapsed();
       renderToday();
       toast("Saved.");
+    });
+    $("#tagAdd").addEventListener("click", () => {
+      const input = $("#tagInput");
+      const tag = safeText(input.value);
+      if(!tag) return;
+      addTag(tag);
+      input.value = "";
+      renderAll();
+    });
+    $("#tagInput").addEventListener("keydown", (e) => {
+      if(e.key === "Enter") { e.preventDefault(); $("#tagAdd").click(); }
     });
     $("#btnShowTips").addEventListener("click", () => {
       startOnboarding(true);
