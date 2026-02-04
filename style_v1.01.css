@@ -297,6 +297,19 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
 .timerBtns{ display:flex; flex-wrap:wrap; gap:10px; margin-top: 16px; justify-content:flex-end; }
 .timerBtns .btn{ padding: 7px 10px; }
 
+.tools-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top: 8px;
+}
+.btn-sm{
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.tools-area{ margin-top: 10px; }
+.tools-area.collapsed{ display:none; }
 .microtools{ display:flex; flex-wrap:wrap; gap:10px; }
 .chip{
   all:unset;
@@ -318,6 +331,49 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   padding: 14px;
   min-height: 64px;
   color: var(--muted);
+}
+.toolbox.compact{
+  border-style: solid;
+  background: #fff;
+  color: var(--text);
+}
+.toolbox .tool-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.toolbox .tool-info{
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  font-weight: 700;
+  color: var(--muted);
+}
+.toolbox .tool-details{
+  display:none;
+  margin-top: 10px;
+  color: var(--muted);
+}
+.toolbox .tool-details.open{ display:block; }
+.toolbox .tool-action{ margin-top: 12px; }
+
+/* Minimal mode */
+body.minimal .sub,
+body.minimal .helper,
+body.minimal .microtools,
+body.minimal .toolbox,
+body.minimal .toolbox .tool-details,
+body.minimal .muted.small{
+  display:none;
+}
+body.minimal .tools-head{
+  margin-top: 0;
 }
 
 .form .row{

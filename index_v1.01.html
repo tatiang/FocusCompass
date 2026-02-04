@@ -134,14 +134,20 @@
 
               <div class="divider"></div>
 
-              <div class="microtools">
-                <button class="chip" data-tool="twoMin">2-minute rule</button>
-                <button class="chip" data-tool="tenMin">10-minute starter</button>
-                <button class="chip" data-tool="shrink">Shrink the task</button>
-                <button class="chip" data-tool="bodyDouble">Body double script</button>
+              <div class="tools-head">
+                <div class="label">Micro-tools</div>
+                <button class="btn btn-ghost btn-sm" id="btnToggleTools">Show tools</button>
               </div>
+              <div class="tools-area" id="toolsArea">
+                <div class="microtools">
+                  <button class="chip" data-tool="twoMin">2-minute rule</button>
+                  <button class="chip" data-tool="tenMin">10-minute starter</button>
+                  <button class="chip" data-tool="shrink">Shrink the task</button>
+                  <button class="chip" data-tool="bodyDouble">Body double script</button>
+                </div>
 
-              <div class="toolbox" id="toolbox"></div>
+                <div class="toolbox" id="toolbox"></div>
+              </div>
             </div>
           </section>
 
@@ -296,6 +302,10 @@
             <label class="row">
               <span>Show self-compassion nudges</span>
               <input id="settingNudges" type="checkbox" />
+            </label>
+            <label class="row">
+              <span>Minimal mode (hide extras)</span>
+              <input id="settingMinimal" type="checkbox" />
             </label>
             <div class="muted small">Low-stim reduces visual noise and animations.</div>
             <div class="divider"></div>

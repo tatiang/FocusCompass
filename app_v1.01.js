@@ -39,7 +39,9 @@
       wipLimit: 3,
       defaultTimerMin: 25,
       lowStim: false,
-      nudges: true
+      nudges: true,
+      minimalMode: false,
+      toolsCollapsed: true
     },
     // tasks not in priorities live in inbox ("captured")
     tasks: [], // {id,text,status:'open'|'done', createdAt, doneAt?, pinned?:bool, due?:iso, projectId?}
@@ -338,12 +340,25 @@
     const t = tools[key];
     const box = $("#toolbox");
     box.innerHTML = "";
-    box.appendChild(el("div", { class:"item-title", text: t.title }));
-    box.appendChild(t.body());
+    box.classList.add("compact");
+
+    const head = el("div", { class:"tool-head" });
+    head.appendChild(el("div", { class:"item-title", text: t.title }));
+    const infoBtn = el("button", { class:"tool-info", text:"i" });
+    head.appendChild(infoBtn);
+    box.appendChild(head);
+
+    const details = el("div", { class:"tool-details" });
+    details.appendChild(t.body());
     if(t.action) {
-      const b = el("button", { class:"btn", text:"Do it now", onclick: t.action });
-      box.appendChild(el("div", { style:"margin-top:12px;" }, [b]));
+      const b = el("button", { class:"btn btn-ghost", text:"Do it now", onclick: t.action });
+      details.appendChild(el("div", { class:"tool-action" }, [b]));
     }
+    box.appendChild(details);
+
+    infoBtn.addEventListener("click", () => {
+      details.classList.toggle("open");
+    });
   }
 
   // ---------- Projects ----------
@@ -1139,11 +1154,27 @@
     $("#settingTimer").value = state.settings.defaultTimerMin;
     $("#settingLowStim").checked = !!state.settings.lowStim;
     $("#settingNudges").checked = !!state.settings.nudges;
+    $("#settingMinimal").checked = !!state.settings.minimalMode;
     applyLowStim();
+    applyMinimalMode();
+    applyToolsCollapsed();
   }
 
   function applyLowStim() {
     document.body.classList.toggle("lowstim", !!state.settings.lowStim);
+  }
+
+  function applyMinimalMode() {
+    document.body.classList.toggle("minimal", !!state.settings.minimalMode);
+  }
+
+  function applyToolsCollapsed() {
+    const area = $("#toolsArea");
+    const btn = $("#btnToggleTools");
+    if(!area || !btn) return;
+    const collapsed = !!state.settings.toolsCollapsed;
+    area.classList.toggle("collapsed", collapsed);
+    btn.textContent = collapsed ? "Show tools" : "Hide tools";
   }
 
   function renderAll() {
@@ -1434,6 +1465,11 @@
 
     // microtools
     $$(".chip").forEach(b => b.addEventListener("click", () => showTool(b.dataset.tool)));
+    $("#btnToggleTools").addEventListener("click", () => {
+      state.settings.toolsCollapsed = !state.settings.toolsCollapsed;
+      save();
+      applyToolsCollapsed();
+    });
 
     // projects
     $("#btnNewProject").addEventListener("click", () => {
@@ -1492,8 +1528,14 @@
       state.settings.defaultTimerMin = def;
       state.settings.lowStim = !!$("#settingLowStim").checked;
       state.settings.nudges = !!$("#settingNudges").checked;
+      state.settings.minimalMode = !!$("#settingMinimal").checked;
+      if(state.settings.minimalMode) {
+        state.settings.toolsCollapsed = true;
+      }
       save();
       applyLowStim();
+      applyMinimalMode();
+      applyToolsCollapsed();
       renderToday();
       toast("Saved.");
     });
@@ -1524,6 +1566,8 @@
 
     // initial state
     applyLowStim();
+    applyMinimalMode();
+    applyToolsCollapsed();
     setTimer(state.settings.defaultTimerMin);
     renderAll();
     showTool("tenMin"); // default helpful tool
