@@ -1,0 +1,482 @@
+<!doctype html>
+<!--
+  File: index_v1.01.html
+  App: Focus Compass (ADHD support)
+  Version: 1.01
+  Notes:
+  - Offline-first (localStorage). No accounts, no tracking.
+  - Designed for time blindness, procrastination, overwhelm, and shame spirals.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Focus Compass v1.01</title>
+  <link rel="stylesheet" href="style_v1.01.css?v=1.01" />
+</head>
+<body>
+  <header class="topbar" role="banner">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">◎</div>
+      <div class="brand-text">
+        <div class="brand-name">Focus Compass</div>
+        <div class="brand-sub">practical ADHD support • offline-first</div>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <button class="btn btn-ghost" id="btnQuickReset" title="Overwhelm reset">Reset</button>
+      <button class="btn btn-ghost" id="btnTimer" title="Start a timer">Timer</button>
+      <button class="btn btn-ghost" id="btnExport" title="Export your data">Export</button>
+      <label class="btn btn-ghost filebtn" title="Import data">
+        Import
+        <input type="file" id="importFile" accept="application/json" />
+      </label>
+    </div>
+  </header>
+
+  <main class="shell" role="main">
+    <aside class="sidebar" aria-label="Primary">
+      <nav class="nav">
+        <button class="nav-item active" data-view="today">
+          <span class="nav-dot" aria-hidden="true"></span>
+          Today
+          <span class="nav-hint">Now + next</span>
+        </button>
+        <button class="nav-item" data-view="projects">
+          <span class="nav-dot" aria-hidden="true"></span>
+          Projects
+          <span class="nav-hint">WIP-limited</span>
+        </button>
+        <button class="nav-item" data-view="routines">
+          <span class="nav-dot" aria-hidden="true"></span>
+          Routines
+          <span class="nav-hint">repeatable</span>
+        </button>
+        <button class="nav-item" data-view="review">
+          <span class="nav-dot" aria-hidden="true"></span>
+          Review
+          <span class="nav-hint">no streaks</span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <span class="nav-dot" aria-hidden="true"></span>
+          Settings
+          <span class="nav-hint">gentle</span>
+        </button>
+        <button class="nav-item" data-view="help">
+          <span class="nav-dot" aria-hidden="true"></span>
+          Help
+          <span class="nav-hint">why it works</span>
+        </button>
+      </nav>
+
+      <section class="capture">
+        <div class="capture-title">Quick capture</div>
+        <div class="capture-row">
+          <input id="quickInput" class="input" type="text" placeholder="Type a task or thought… (Enter to save)" />
+          <button id="quickAdd" class="btn">Add</button>
+        </div>
+        <div class="capture-meta">
+          <button class="link" id="btnHoldThought" title="Log an interruption so you can return later">Hold that thought</button>
+          <span class="muted" id="captureStatus"></span>
+        </div>
+      </section>
+
+      <section class="sidebar-card">
+        <div class="card-title">Your next good step</div>
+        <div class="card-body" id="nextStepCard">
+          <div class="muted">Pick a task in “Today” to set a Next Step.</div>
+        </div>
+      </section>
+    </aside>
+
+    <section class="content">
+      <!-- TODAY -->
+      <section class="view active" id="view-today" aria-labelledby="hToday">
+        <div class="view-head">
+          <div>
+            <h1 id="hToday">Today</h1>
+            <p class="sub">Choose 1–3 priorities. Keep everything else “captured,” not “carried.”</p>
+          </div>
+          <div class="view-actions">
+            <button class="btn" id="btnAddPriority">Add priority</button>
+            <button class="btn btn-ghost" id="btnAutopick">Autopick next</button>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Now</h2>
+              <div class="pill" id="pillNow">No timer running</div>
+            </div>
+            <div class="panel-body">
+              <div class="now-row">
+                <div class="now-left">
+                  <div class="label">Next step</div>
+                  <div class="big" id="nowNextStep">—</div>
+                  <div class="muted" id="nowContext">Choose a task → “Set as Next Step”.</div>
+                </div>
+                <div class="now-right">
+                  <div class="timerRing" aria-hidden="true">
+                    <div class="timerRingInner">
+                      <div class="timerTime" id="timerTime">00:00</div>
+                      <div class="timerMeta" id="timerMeta">ready</div>
+                    </div>
+                  </div>
+                  <div class="timerBtns">
+                    <button class="btn btn-ghost" data-preset="10">10m</button>
+                    <button class="btn btn-ghost" data-preset="25">25m</button>
+                    <button class="btn btn-ghost" data-preset="45">45m</button>
+                    <button class="btn" id="btnStartStop">Start</button>
+                    <button class="btn btn-ghost" id="btnClearTimer">Clear</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="microtools">
+                <button class="chip" data-tool="twoMin">2-minute rule</button>
+                <button class="chip" data-tool="tenMin">10-minute starter</button>
+                <button class="chip" data-tool="shrink">Shrink the task</button>
+                <button class="chip" data-tool="bodyDouble">Body double script</button>
+              </div>
+
+              <div class="toolbox" id="toolbox"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Priorities</h2>
+              <div class="pill" id="pillWip">WIP limit: <span id="wipLimitText">3</span></div>
+            </div>
+            <div class="panel-body">
+              <div class="list" id="priorityList"></div>
+              <div class="muted small">Tip: WIP-limiting is an anti-overwhelm strategy, not a moral judgment.</div>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Captured</h2>
+            <div class="view-actions">
+              <button class="btn btn-ghost" id="btnClearDone">Archive done</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="list" id="inboxList"></div>
+          </div>
+        </section>
+      </section>
+
+      <!-- PROJECTS -->
+      <section class="view" id="view-projects" aria-labelledby="hProjects">
+        <div class="view-head">
+          <div>
+            <h1 id="hProjects">Projects</h1>
+            <p class="sub">A project is “more than one step.” Give each one a next action and a definition of done.</p>
+          </div>
+          <div class="view-actions">
+            <button class="btn" id="btnNewProject">New project</button>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <section class="panel">
+            <div class="panel-head"><h2>Active projects</h2></div>
+            <div class="panel-body">
+              <div class="list" id="projectList"></div>
+            </div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>Project details</h2></div>
+            <div class="panel-body" id="projectDetails">
+              <div class="muted">Select a project to view/edit.</div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <!-- ROUTINES -->
+      <section class="view" id="view-routines" aria-labelledby="hRoutines">
+        <div class="view-head">
+          <div>
+            <h1 id="hRoutines">Routines</h1>
+            <p class="sub">Repeatable checklists reduce decision fatigue. Keep them short and realistic.</p>
+          </div>
+          <div class="view-actions">
+            <button class="btn" id="btnNewRoutine">New routine</button>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <section class="panel">
+            <div class="panel-head"><h2>Your routines</h2></div>
+            <div class="panel-body">
+              <div class="muted small">Starter templates</div>
+              <div class="list" id="routineTemplates"></div>
+              <div class="divider"></div>
+              <div class="list" id="routineList"></div>
+            </div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>Run routine</h2></div>
+            <div class="panel-body" id="routineRunner">
+              <div class="muted">Select a routine to run it.</div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <!-- REVIEW -->
+      <section class="view" id="view-review" aria-labelledby="hReview">
+        <div class="view-head">
+          <div>
+            <h1 id="hReview">Review</h1>
+            <p class="sub">No streaks. No “falling behind.” Just honest data and a kinder narrative.</p>
+          </div>
+          <div class="view-actions">
+            <button class="btn btn-ghost" id="btnWeeklyReview">Weekly review</button>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <section class="panel">
+            <div class="panel-head"><h2>Wins log</h2></div>
+            <div class="panel-body">
+              <div class="muted small">“Wins” include showing up, starting, asking for help, stopping a spiral.</div>
+              <div class="capture-row">
+                <input id="winInput" class="input" type="text" placeholder="Add a win… (Enter)" />
+                <button id="winAdd" class="btn">Add</button>
+              </div>
+              <div class="list" id="winsList"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h2>Gentle stats</h2></div>
+            <div class="panel-body" id="statsBox"></div>
+          </section>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head"><h2>Interruption parking lot</h2></div>
+          <div class="panel-body">
+            <div class="muted small">This is where “I should say/remember…” goes so you can return to the moment.</div>
+            <div class="list" id="interruptList"></div>
+          </div>
+        </section>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="view" id="view-settings" aria-labelledby="hSettings">
+        <div class="view-head">
+          <div>
+            <h1 id="hSettings">Settings</h1>
+            <p class="sub">Tune the app to match your brain instead of forcing your brain to match the app.</p>
+          </div>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head"><h2>Behavior</h2></div>
+          <div class="panel-body form">
+            <label class="row">
+              <span>WIP limit (max priorities)</span>
+              <input id="settingWip" class="input small" type="number" min="1" max="10" step="1" />
+            </label>
+            <label class="row">
+              <span>Default timer minutes</span>
+              <input id="settingTimer" class="input small" type="number" min="1" max="180" step="1" />
+            </label>
+            <label class="row">
+              <span>Low-stim mode</span>
+              <input id="settingLowStim" type="checkbox" />
+            </label>
+            <label class="row">
+              <span>Show self-compassion nudges</span>
+              <input id="settingNudges" type="checkbox" />
+            </label>
+            <div class="muted small">Low-stim reduces visual noise and animations.</div>
+            <div class="divider"></div>
+            <button class="btn" id="btnSaveSettings">Save settings</button>
+            <button class="btn btn-ghost" id="btnShowTips">Show onboarding tips</button>
+            <button class="btn btn-ghost" id="btnFactoryReset">Factory reset (clears local data)</button>
+          </div>
+        </section>
+      </section>
+
+      <!-- HELP -->
+      <section class="view" id="view-help" aria-labelledby="hHelp">
+        <div class="view-head">
+          <div>
+            <h1 id="hHelp">Help</h1>
+            <p class="sub">Why this app works for ADHD brains (and how to use it kindly).</p>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <section class="panel">
+            <div class="panel-head"><h2>Core idea</h2></div>
+            <div class="panel-body">
+              <p class="muted">Focus Compass is designed to reduce executive-function load, not to force willpower. It externalizes time and decisions, reduces overwhelm through limits, and uses gentle language to defuse shame spirals.</p>
+              <div class="divider"></div>
+              <p class="muted small">If you struggle with inattention, the goal is not perfect focus. It’s to make the next step so small and visible that attention has something obvious to land on.</p>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h2>When you feel stuck</h2></div>
+            <div class="panel-body">
+              <p class="muted">Try a 10-minute starter, then stop. Starting is often the hardest part; a short timer is a workaround for that friction.</p>
+              <p class="muted">Use the Quick Capture box to unload thoughts. Captured tasks reduce mental noise and help you return to the moment.</p>
+              <p class="muted">If you’re spiraling, use Reset. It offers tiny, concrete actions to help your nervous system settle.</p>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head"><h2>Why each feature exists</h2></div>
+          <div class="panel-body">
+            <div class="list">
+              <div class="item">
+                <div class="item-left">
+                  <div class="item-title">Next Step</div>
+                  <div class="item-meta">One clear task reduces decision fatigue. It should be startable in under 10 minutes.</div>
+                </div>
+              </div>
+              <div class="item">
+                <div class="item-left">
+                  <div class="item-title">WIP limit (Priorities)</div>
+                  <div class="item-meta">Limits protect attention. Fewer active items means less overwhelm and more progress.</div>
+                </div>
+              </div>
+              <div class="item">
+                <div class="item-left">
+                  <div class="item-title">Timers</div>
+                  <div class="item-meta">Externalize time. Short timers create urgency without burnout and help you start.</div>
+                </div>
+              </div>
+              <div class="item">
+                <div class="item-left">
+                  <div class="item-title">Quick capture</div>
+                  <div class="item-meta">Stops memory anxiety. If it’s captured, you don’t have to keep rethinking it.</div>
+                </div>
+              </div>
+              <div class="item">
+                <div class="item-left">
+                  <div class="item-title">Projects + Chunking</div>
+                  <div class="item-meta">Projects are overwhelming without structure. Chunking turns them into small, doable steps.</div>
+                </div>
+              </div>
+              <div class="item">
+                <div class="item-left">
+                  <div class="item-title">Routines</div>
+                  <div class="item-meta">Checklists reduce decision fatigue and keep you from reinventing the same steps.</div>
+                </div>
+              </div>
+              <div class="item">
+                <div class="item-left">
+                  <div class="item-title">Wins log</div>
+                  <div class="item-meta">ADHD brains often discount progress. Logging wins rebuilds a kinder narrative.</div>
+                </div>
+              </div>
+              <div class="item">
+                <div class="item-left">
+                  <div class="item-title">Interruption parking lot</div>
+                  <div class="item-meta">A safe place for thoughts that pop up mid-task so you can return to focus.</div>
+                </div>
+              </div>
+              <div class="item">
+                <div class="item-left">
+                  <div class="item-title">Low-stim + Nudges</div>
+                  <div class="item-meta">Low-stim reduces visual noise; nudges reinforce self-compassion.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="grid2">
+          <section class="panel">
+            <div class="panel-head"><h2>ADHD coping tips</h2></div>
+            <div class="panel-body">
+              <div class="list">
+                <div class="item">
+                  <div class="item-left">
+                    <div class="item-title">Inattention</div>
+                    <div class="item-meta">Make the first action physical and obvious: open the document, put tools on the table, or write a two-word headline.</div>
+                  </div>
+                </div>
+                <div class="item">
+                  <div class="item-left">
+                    <div class="item-title">Time blindness</div>
+                    <div class="item-meta">Always use a timer. “Work for 10 minutes then stop” is easier than “finish it.”</div>
+                  </div>
+                </div>
+                <div class="item">
+                  <div class="item-left">
+                    <div class="item-title">Procrastination</div>
+                    <div class="item-meta">Shrink the task until it feels almost too easy. Starting is the win.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h2>Interrupting + long stories</h2></div>
+            <div class="panel-body">
+              <div class="list">
+                <div class="item">
+                  <div class="item-left">
+                    <div class="item-title">Interrupting</div>
+                    <div class="item-meta">Use “Hold that thought” during conversations. It gives your brain permission to let go without losing the idea.</div>
+                  </div>
+                </div>
+                <div class="item">
+                  <div class="item-left">
+                    <div class="item-title">Long-winded stories</div>
+                    <div class="item-meta">Try “headline first.” Say the main point in one sentence, then ask: “Want the full story?”</div>
+                  </div>
+                </div>
+                <div class="item">
+                  <div class="item-left">
+                    <div class="item-title">Check-ins</div>
+                    <div class="item-meta">Mid-story, pause and ask: “Is this enough detail, or should I keep going?” It builds consent and connection.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head"><h2>Gentle reminders</h2></div>
+          <div class="panel-body">
+            <p class="muted">You’re not broken. You’re managing a nervous system with different wiring. Small steps are not “too small.” They’re how momentum begins.</p>
+            <p class="muted">Use this app as a support, not a scorecard. The goal is fewer spirals and more kindness, not perfect productivity.</p>
+          </div>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <!-- MODAL: simple -->
+  <div class="modal" id="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <div class="modal-title" id="modalTitle">Modal</div>
+        <button class="btn btn-ghost" data-close="1" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-foot" id="modalFoot"></div>
+    </div>
+  </div>
+
+  <script src="app_v1.01.js?v=1.01"></script>
+</body>
+</html>
