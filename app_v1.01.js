@@ -25,6 +25,7 @@
     appId: "1:334786606663:web:f0b02dcde30fd71aa76362",
     measurementId: "G-BSBT6PJ9Q4"
   };
+  const FIREBASE_APPCHECK_SITE_KEY = "6Lfv82AsAAAAAAzT8L-DoKtQpZVGvcC9QBiI_Ypy";
   const BACKUP_DEBOUNCE_MS = 30000;
 
   // ---------- Utilities ----------
@@ -176,6 +177,11 @@
     if(!window.firebase || !FIREBASE_CONFIG || !FIREBASE_CONFIG.projectId) return;
     try {
       if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+      if(firebase.appCheck && FIREBASE_APPCHECK_SITE_KEY) {
+        try {
+          firebase.appCheck().activate(FIREBASE_APPCHECK_SITE_KEY, true);
+        } catch {}
+      }
       firestoreDb = firebase.firestore();
     } catch {
       firestoreDb = null;
