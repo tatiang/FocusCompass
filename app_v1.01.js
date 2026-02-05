@@ -162,6 +162,7 @@
   let firestoreDb = null;
   let backupTimer = null;
   let pendingBackup = false;
+  let backupStatus = "offline";
 
   function getDeviceId() {
     const key = "focus_compass_device_id";
@@ -183,8 +184,29 @@
         } catch {}
       }
       firestoreDb = firebase.firestore();
+      setBackupStatus("online");
     } catch {
       firestoreDb = null;
+      setBackupStatus("blocked");
+    }
+  }
+
+  function setBackupStatus(status) {
+    backupStatus = status;
+    const el = document.getElementById("backupStatus");
+    if(!el) return;
+    el.classList.remove("online", "blocked", "syncing");
+    if(status === "online") {
+      el.textContent = "Backup: Online";
+      el.classList.add("online");
+    } else if(status === "syncing") {
+      el.textContent = "Backup: Syncing";
+      el.classList.add("syncing");
+    } else if(status === "blocked") {
+      el.textContent = "Backup: Blocked";
+      el.classList.add("blocked");
+    } else {
+      el.textContent = "Backup: Offline";
     }
   }
 
@@ -193,6 +215,7 @@
     if(!firestoreDb) return;
     clearTimeout(backupTimer);
     backupTimer = setTimeout(runBackup, BACKUP_DEBOUNCE_MS);
+    setBackupStatus(navigator.onLine ? "syncing" : "offline");
   }
 
   async function runBackup() {
@@ -207,8 +230,10 @@
       };
       await firestoreDb.collection("backups").doc(deviceId).set(payload);
       pendingBackup = false;
+      setBackupStatus("online");
     } catch {
       pendingBackup = true;
+      setBackupStatus("blocked");
     }
   }
 
@@ -1911,7 +1936,11 @@
     startOnboarding(false);
 
     window.addEventListener("online", () => {
+      setBackupStatus("online");
       if(pendingBackup) scheduleBackup();
+    });
+    window.addEventListener("offline", () => {
+      setBackupStatus("offline");
     });
   }
 
